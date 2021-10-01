@@ -1,0 +1,198 @@
+---
+title: "DV Assignment4"
+author: "Sonal Singh"
+date: "08/04/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r warning=FALSE}
+#importing libraries
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+#install.packages("countrycode")
+library(remotes)
+#install_github('vincentarelbundock/countrycode')
+library(countrycode)
+
+# reading csv file in pisadata
+pisadata<-read_csv("OECD_PISA.csv")
+
+#getting full form of country name abbreviations
+pisadata$Country <- countrycode(pisadata$LOCATION, origin = "iso3c", destination = "country.name")
+#since no match was found for OAVG the value was NA, we thus assign value to it manually
+pisadata$Country[is.na(pisadata$Country)] = "OECD-Average"
+#View(pisadata)
+
+#storing 2018 data for Girl and Boy subject in df1
+df1 <- pisadata %>% filter(SUBJECT %in% c("GIRL","BOY"), TIME == 2018)
+#View(df1)
+
+#creating df1_level to plot the countries in order of increasing value of boy subject
+df1%>%filter(SUBJECT %in% c("BOY"), TIME == 2018)%>%arrange(Value)%>%select(Country)->df1_levels
+#View(df1_levels)
+
+#Unlisting df1_levels
+df1_levels<- unlist(as.list(as.data.frame(df1_levels)))
+
+#Converting the Country column to factor
+df1$Country<- factor(df1$Country)
+
+# reset the country order in df1 according to the country order in df1_levels
+df1$Country<-factor(df1$Country, levels=df1_levels)
+
+#To make the label red in colour if country is Ireland
+col <- ifelse(df1_levels == "Ireland", "red", "black")
+
+#To make the font face bold if country is OECD-Average
+fc <- ifelse(df1_levels == "OECD-Average", "bold", "plain")
+
+#Plot 1
+plot1 <- ggplot(df1, aes(x = Value, y = Country, fill = SUBJECT)) + 
+        scale_x_continuous(limits = c(340, 560), breaks = seq(340,560,20)) +
+        scale_y_discrete(expand=c(0,2)) +
+        #geom_segment to create a segment between x axis and datapoints
+        geom_segment(aes(yend = Country), xend = 0, colour="white", size=0.4, linetype= "solid") +
+        #geom_line to create a grey segment between boy value and girl value datapoint
+        geom_line(aes(group = Country), colour = "grey", size = 0.5) +
+        #datapoint if subject is girl and country is not Ireland or OECD-Average
+        geom_point(
+          data = df1 %>% filter(SUBJECT == "GIRL" & Country != "Ireland" & Country != "OECD-Average"),
+          size = 2.5, shape = 5, colour = "#11475a", show.legend = FALSE) +
+        #datapoint if subject is boy and country is not Ireland or OECD-Average
+        geom_point(
+          data = df1 %>% filter(SUBJECT == "BOY" & Country != "Ireland" & Country != "OECD-Average"),
+          fill = "#11475a", size = 2.5, shape = 21, colour = "#11475a", show.legend= FALSE) +
+        #datapoint if subject is girl and country is Ireland
+        geom_point(
+          data = df1 %>% filter(SUBJECT == "GIRL" & Country == "Ireland"), fill ="red",
+          size = 2.5, shape = 23, colour = "red", show.legend= FALSE) +
+        #datapoint if subject is boy and country is Ireland
+        geom_point(
+          data = df1 %>% filter(SUBJECT == "BOY" & Country == "Ireland"),
+          fill ="red", size = 2.5, shape = 21, colour = "red", show.legend= FALSE)  +
+        #datapoint if subject is girl and country is OECD-Average
+        geom_point(
+          data = df1 %>% filter(SUBJECT == "GIRL" & Country == "OECD-Average"),
+          fill ="black", size = 2.5, shape = 23, colour = "black", show.legend= FALSE) +
+        #datapoint if subject is boy and country is OECD-Average
+        geom_point(
+          data = df1 %>% filter(SUBJECT == "BOY" & Country == "OECD-Average"),
+          fill ="black", size = 2.5, shape = 21, colour = "black", show.legend= FALSE) +
+        #giving a heading to the plot
+        labs(subtitle = expression(paste(scriptstyle(bold("Reading performance (PISA) ")),
+              scriptscriptstyle(bold(" Boys/Girls, Mean score, 2018                                                    Source: PISA: Programme for international student assessment"))))) +
+        #scale_shape_manual(name='', values=c('Boy'=21, 'Girl'=5), guide='legend') +
+        #guides(shape = guide_legend(override.aes = list(linetype=c(0,0),shape=c(21, 5)))) +
+        #Theme definition
+        theme_bw() +
+        theme(
+          #to bring the y axis text within the colored plot area
+          axis.text.y = element_text(vjust = -0.8, hjust=-0.2, margin = margin(l = 5, r = -18)),
+          #to tilt the labels and color/give font face to them according to country name
+          axis.text.x= element_text(angle=50, vjust=0.6, size = 7, colour = col, face=fc),
+          #to make the axis ticks invisible
+          axis.ticks=element_blank(),
+          panel.grid.major.y = element_line(size=0.3,linetype='solid', colour="white"),
+          #since we want to make all other grid lines invisible except major y
+          panel.grid.minor.x = element_blank(), panel.grid.minor.y = element_blank(),
+          panel.grid.major.x = element_blank(),
+          #plot margin and title
+          plot.margin = unit(c(1,0, 1,0), "cm"),
+          plot.subtitle = element_text(size = 12, face = "bold", vjust = 0.2, hjust = 0),
+          plot.background = element_rect(fill="white"),
+          #to give panel (colored rectangle in plot) blue background color
+          panel.background = element_rect(fill="#d5e8f5"),
+          panel.grid = element_blank(), panel.border = element_blank(),
+          #since we dont want the x and y axis titles to be visible on plot
+          axis.title.x=element_blank(), axis.title.y=element_blank(),
+          #legend title, position and direction
+          legend.title = element_blank(), legend.position = c(0,-0.3), legend.direction = "horizontal",) + 
+          coord_flip()
+
+plot(plot1)
+
+#Reading pisadata in df2
+df2 <- pisadata
+#View(df2)
+
+#creating a dataset that will show the sum of TOT (Girl + Boy Subject) of all years for each country
+df2temp<- df2 %>% filter(SUBJECT %in% c("TOT")) %>% group_by(LOCATION) %>% summarise(OverallTotal=sum(Value,na.rm=TRUE))
+#View(df2temp)
+
+#Finding out 3 Countries with maximum total value
+print(unlist(as.list(df2temp[order(df2temp$OverallTotal, decreasing=TRUE)[1:3],1])))
+
+#subsetting the data only for these 3 countries in df2 for subjects GIRL and BOY
+df2  <- df2 %>% filter(LOCATION %in% c("FIN","KOR","CAN"), SUBJECT %in% c("GIRL","BOY"))
+#View(df2)
+
+#Calculating the mean value of each subject for each year
+#(Since we will compare each country's girl and boy values with the mean of these 3 countries)
+df2 %>% filter(SUBJECT=="BOY") %>% group_by(TIME) %>% summarise(meanbvalue = mean(Value, na.rm = TRUE)) ->BoysValue
+#View(BoysValue)
+
+df2 %>% filter(SUBJECT=="GIRL") %>% group_by(TIME) %>% summarise(meangvalue = mean(Value, na.rm = TRUE)) ->GirlsValue
+#View(GirlsValue)
+
+#Making the Country column of df2 as factor
+df2$Country<- factor(df2$Country)
+
+#Plot 2
+plot2<- ggplot(df2, aes(x =TIME, y=Value)) +
+          #geom_segment to create a segment between x axis and datapoints
+          geom_segment(aes(xend = TIME), yend = 0, colour="white", size=0.3, linetype= "solid") +
+          #datapoint for girl subject
+          geom_point(data = df2 %>% filter(SUBJECT == "GIRL"), size = 2.5, shape = 5, colour = "#11475a") +
+          #datapoint for boy subject
+          geom_point( data = df2 %>% filter(SUBJECT == "BOY"), fill = "#11475a", size = 2.5,
+                      shape = 21, colour = "#11475a") +
+          #line for boy subject
+          geom_line(data = df2 %>% filter(SUBJECT == "BOY"), colour = "#11475a", size = 0.4,
+                    linetype="dotted") +
+          #line for girl subject
+          geom_line(data = df2 %>% filter(SUBJECT == "GIRL"), colour = "#11475a", size = 0.4,
+                    linetype="dotted" ) +
+          #line for mean value of boy subject in all 3 countries
+          geom_line(data =BoysValue, aes(x =TIME, y=meanbvalue), col="red", size = 0.4,
+                    linetype="dotted" ) +
+          #line for mean value of girl subject in all 3 countries
+          geom_line(data =GirlsValue, aes(x =TIME, y=meangvalue), col="blue", size = 0.4,
+                    linetype="dotted" ) +
+          #scaling x and y axis
+          scale_x_continuous(breaks=seq(2000,2018, by= 3)) +
+          scale_y_continuous(breaks=seq(400,600, by= 5), labels=seq(400,600, by = 5)) + 
+          ggtitle("Timeseries Analysis") +
+          theme_bw() +
+          #theme definition
+          theme( # legend properties
+                legend.text = element_text(size = 8), legend.title = element_blank(),
+                legend.position = c(0,1), legend.direction = "horizontal",
+                #setting plot and panel background color
+                plot.background = element_rect(fill="white"),
+                panel.background = element_rect(fill="#d5e8f5"),
+                panel.grid.major.y = element_line(size=0.3,linetype='solid', colour="white"),
+                #plt margins and title
+                plot.margin = margin(1, 1, 1, 1),
+                plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+                #to tilt the text on x axis
+                axis.text.x = element_text(angle=60, hjust = 1, size=6),
+                axis.text.y = element_text( size=6),
+                axis.title.x = element_blank(),
+                strip.text.x = element_text(size=7, face="bold"),
+                strip.background = element_blank(),
+                panel.grid = element_blank(),
+                panel.border = element_blank()) +
+                #to facet the plot in 3 columns in 1 row
+                facet_wrap(vars(Country),ncol=3)
+
+plot(plot2)
+
+```
+
